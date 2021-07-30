@@ -39,6 +39,12 @@ jobs:
         run: |
           sudo apt-get install libgtk-3-dev libcairo2-dev libglib2.0-dev
           go get .
+      - name: Cache multiple paths
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/go
+          key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
       - name: Build
         run: |
           go build m
