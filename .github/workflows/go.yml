@@ -50,7 +50,7 @@ jobs:
           go get .
       - name: Build
         run: |
-          go build m
+          go build .
           mkdir stupid-simple-mail
           cp -r ui stupid-simple-mail
           cp SSM stupid-simple-mail
