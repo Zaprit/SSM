@@ -34,17 +34,20 @@ jobs:
           stable: true # optional, default is true
           # Used to pull node distributions from go-versions.  Since there's a default, this is typically not supplied by the user.
           token: ${{ github.token }} # optional, default is ${{ github.token }}
-  
-      - name: Get Dependencies
-        run: |
-          sudo apt-get install libgtk-3-dev libcairo2-dev libglib2.0-dev
-          go get .
       - name: Cache multiple paths
+        id: cache-deps
         uses: actions/cache@v2
         with:
           path: |
-            ~/go
-          key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+            ~/go/pkg
+          key: ${{ runner.os }}-gopkgs
+      - name: Get Dependencies
+        run: |
+          time sudo apt-get install libgtk-3-dev libcairo2-dev libglib2.0-dev
+      - name: Get Go Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          go get .
       - name: Build
         run: |
           go build m
