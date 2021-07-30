@@ -2,8 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/emersion/go-imap"
-	"github.com/emersion/go-imap/client"
+	"errors"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/zalando/go-keyring"
@@ -16,10 +15,11 @@ type account struct {
 	Password string
 }
 
+var firstTimeSetup = false
+
 func main() {
 	service := "ssm-email"
 	accountList, err := keyring.Get(service, "accounts")
-	firstTimeSetup := false
 	if err != nil {
 		print("account list not found, asking user some dumb questions about e-mail")
 		firstTimeSetup = true
@@ -54,88 +54,43 @@ func main() {
 	os.Exit(application.Run(os.Args))
 }
 func onActivate(application *gtk.Application) {
-	// Create ApplicationWindow
-	appWindow, err := gtk.ApplicationWindowNew(application)
-	if err != nil {
-		log.Fatal("Could not create application window.", err)
+	// Get the GtkBuilder UI definition in the glade file.
+	builder, err := gtk.BuilderNewFromFile("ui/SSM.glade")
+	errorCheck(err)
+
+	// Map the handlers to callback functions, and connect the signals
+	// to the Builder.
+	signals := map[string]interface{}{
+		"on_main_window_destroy": onMainWindowDestroy,
 	}
-	// Set ApplicationWindow Properties
-	appWindow.SetTitle("")
-	appWindow.SetDefaultSize(400, 400)
-	appWindow.Show()
+	builder.ConnectSignals(signals)
+
+	// Get the object with the id of "main_window".
+	obj, err := builder.GetObject("MainWindow")
+	errorCheck(err)
+
+	// Verify that the object is a pointer to a gtk.ApplicationWindow.
+	win, err := isWindow(obj)
+	errorCheck(err)
+
+	// Show the Window and all of its components.
+	win.Show()
+	application.AddWindow(win)
+
 }
-
-func mailTest() {
-	log.Println("Connecting to server...")
-
-	// Connect to server
-	c, err := client.DialTLS("mail.valtek.uk:993", nil)
-	if err != nil {
-		log.Fatal(err)
+func onMainWindowDestroy() {
+	log.Println("onMainWindowDestroy")
+}
+func isWindow(obj glib.IObject) (*gtk.Window, error) {
+	// Make type assertion (as per gtk.go).
+	if win, ok := obj.(*gtk.Window); ok {
+		return win, nil
 	}
-	log.Println("Connected")
-
-	// Don't forget to logout
-	defer func(c *client.Client) {
-		err := c.Logout()
-		if err != nil {
-			print(err)
-		}
-	}(c)
-
-	// Login
-	if err := c.Login("garbagecan@valtek.uk", ":,87,arNACHiE"); err != nil {
-		log.Fatal(err)
+	return nil, errors.New("not a *gtk.Window")
+}
+func errorCheck(e error) {
+	if e != nil {
+		// panic for any errors.
+		log.Panic(e)
 	}
-	log.Println("Logged in")
-
-	// List mailboxes
-	mailboxes := make(chan *imap.MailboxInfo, 10)
-	done := make(chan error, 1)
-	go func() {
-		done <- c.List("", "*", mailboxes)
-	}()
-
-	log.Println("Mailboxes:")
-	for m := range mailboxes {
-		log.Println("* " + m.Name)
-	}
-
-	if err := <-done; err != nil {
-		log.Fatal(err)
-	}
-
-	// Select INBOX
-	mbox, err := c.Select("INBOX", false)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Flags for INBOX:", mbox.Flags)
-
-	// Get the last 4 messages
-	from := uint32(1)
-	to := mbox.Messages
-	if mbox.Messages > 3 {
-		// We're using unsigned integers here, only subtract if the result is > 0
-		from = mbox.Messages - 3
-	}
-	seqset := new(imap.SeqSet)
-	seqset.AddRange(from, to)
-
-	messages := make(chan *imap.Message, 10)
-	done = make(chan error, 1)
-	go func() {
-		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
-	}()
-
-	log.Println("Last 4 messages:")
-	for msg := range messages {
-		log.Println("* " + msg.Envelope.Subject)
-	}
-
-	if err := <-done; err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("Done!")
 }
