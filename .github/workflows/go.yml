@@ -34,12 +34,13 @@ jobs:
           stable: true # optional, default is true
           # Used to pull node distributions from go-versions.  Since there's a default, this is typically not supplied by the user.
           token: ${{ github.token }} # optional, default is ${{ github.token }}
-      - name: Cache multiple paths
+      - name: Cache cgo dependencies
         id: cache-deps
         uses: actions/cache@v2
         with:
           path: |
             ~/go/pkg
+            ~/.cache/go-build
           key: ${{ runner.os }}-gopkgs
       - name: Get Dependencies
         run: |
